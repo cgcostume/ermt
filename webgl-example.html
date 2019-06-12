@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv = "x-ua-compatible" content = "ie=edge">
+    <meta name = "viewport" content = "width=device-width initial-scale=1">
+    
+    <title>ERMT</title>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootswatch@4.3.1/dist/lux/bootstrap.min.css">
+
+    <link rel = "stylesheet" href = "webgl-example.css">
+
+</head>
+
+<body>
+
+    <div class="container">
+
+        <div class="jumbotron px-0 pb-4">
+            <h1 class="display-4">Equirectangular Map Transform</h1>
+            <p class="lead">Computes cube, sphere, and poraboloid maps for a given equirectangular input image.</p>
+            <hr class="my-4">
+            <div id="file-api-missing-alert" class="alert alert-danger d-none" role="alert">
+                The File APIs, required for equirectangular image input, are not fully supported in this browser.
+            </div>
+            <div class="input-group">
+                <div class="custom-file">
+                    <input type="file" accept="image/*" class="custom-file-input" id="input-file" name="input-file">
+                    <label class="custom-file-label" for="input-file">Choose Equirectangular Input Image</label>
+                </div>
+            </div>
+
+            <div class="input-group my-4">
+                <div class="input-group-prepend">
+                    <label class="input-group-text" for="cube-map-size">Super Sampling (Progressive NDC Shifting)</label>
+                </div>               
+                <select class="custom-select" id="input-samples">
+                    <option value="1">  01 None</option>
+                    <option value="8">  08 Golden Set</option>
+                    <option value="64" selected>  64 Golden Set</option>
+                </select>
+            </div>
+            
+        </div>
+    </div>
+
+    <div class="container d-none">
+    
+        <div class="row">
+            <div class="col">
+                <p>Hidden canvas using webgl-operate for equirectangular map transforms.</p>
+                <canvas></canvas>
+            </div>
+        </div>
+        
+    </div>
+
+    <div class="container mt-5">
+        
+        <div class="row">
+            <div class="col">
+                <h1>Cube Map - Six Faces</h1>
+
+                <div class="input-group my-4">
+                    <div class="input-group-prepend">
+                        <label class="input-group-text" for="cube-map-size">Output Size in Pixel</label>
+                    </div>               
+                    <select class="custom-select" id="cube-map-size">
+                        <option value="4">  16</option>
+                        <option value="5">  32</option>
+                        <option value="6">  64</option>
+                        <option value="7">  128</option>
+                        <option value="8">  256</option>
+                        <option value="9" selected>  512</option>
+                        <option value="10">1024</option>
+                        <option value="11">2048</option>
+                        <option value="12">4096</option>
+                    </select>
+                    <div class="input-group-append">
+                        <button class="btn btn-outline-secondary" type="button" id="cube-map-compute">Compute Maps</button>
+                    </div>
+                </div>
+    
+            </div>   
+        </div>
+
+        <div class="row">
+            <div class="col"><figure class="figure"><a href="#" download="cube-map-nx.png" target="_blank"><img id="cube-map-nx" src="" class="figure-img img-fluid rounded"></a><figcaption class="figure-caption">Negative X | Left</figcaption></figure></div>
+            <div class="col"><figure class="figure"><a href="#" download="cube-map-pz.png" target="_blank"><img id="cube-map-pz" src="" class="figure-img img-fluid rounded"></a><figcaption class="figure-caption">Positive Z | Front</figcaption></figure></div>
+            <div class="col"><figure class="figure"><a href="#" download="cube-map-px.png" target="_blank"><img id="cube-map-px" src="" class="figure-img img-fluid rounded"></a><figcaption class="figure-caption">Positive X | Right</figcaption></figure></div>
+            <div class="col"><figure class="figure"><a href="#" download="cube-map-nz.png" target="_blank"><img id="cube-map-nz" src="" class="figure-img img-fluid rounded"></a><figcaption class="figure-caption">Negative Z | Back</figcaption></figure></div>
+            <div class="col"><figure class="figure"><a href="#" download="cube-map-py.png" target="_blank"><img id="cube-map-py" src="" class="figure-img img-fluid rounded"></a><figcaption class="figure-caption">Positive Y | Top</figcaption></figure></div>
+            <div class="col"><figure class="figure"><a href="#" download="cube-map-ny.png" target="_blank"><img id="cube-map-ny" src="" class="figure-img img-fluid rounded"></a><figcaption class="figure-caption">Negative Y | Bottom</figcaption></figure></div>
+        </div>
+
+    </div>
+    
+    <div class="container mt-5">
+        
+        <div class="row">
+            <div class="col">
+                <h1>Sphere Map - Six Variations/Orientations</h1>
+
+                <div class="input-group my-4">
+                    <div class="input-group-prepend">
+                        <label class="input-group-text" for="sphere-map-size">Output Size in Pixel</label>
+                    </div>               
+                    <select class="custom-select" id="sphere-map-size">
+                        <option value="4">  16</option>
+                        <option value="5">  32</option>
+                        <option value="6">  64</option>
+                        <option value="7">  128</option>
+                        <option value="8">  256</option>
+                        <option value="9" selected>  512</option>
+                        <option value="10">1024</option>
+                        <option value="11">2048</option>
+                        <option value="12">4096</option>
+                    </select>
+                    <div class="input-group-append">
+                        <button class="btn btn-outline-secondary" type="button" id="sphere-map-compute">Compute Maps</button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col"><figure class="figure"><a href="#" download="sphere-map-nx.png" target="_blank"><img id="sphere-map-nx" src="" class="figure-img img-fluid rounded"></a><figcaption class="figure-caption">Negative X | Left</figcaption></figure></div>
+            <div class="col"><figure class="figure"><a href="#" download="sphere-map-pz.png" target="_blank"><img id="sphere-map-pz" src="" class="figure-img img-fluid rounded"></a><figcaption class="figure-caption">Positive Z | Front</figcaption></figure></div>
+            <div class="col"><figure class="figure"><a href="#" download="sphere-map-px.png" target="_blank"><img id="sphere-map-px" src="" class="figure-img img-fluid rounded"></a><figcaption class="figure-caption">Positive X | Right</figcaption></figure></div>
+            <div class="col"><figure class="figure"><a href="#" download="sphere-map-nz.png" target="_blank"><img id="sphere-map-nz" src="" class="figure-img img-fluid rounded"></a><figcaption class="figure-caption">Negative Z | Back</figcaption></figure></div>
+            <div class="col"><figure class="figure"><a href="#" download="sphere-map-py.png" target="_blank"><img id="sphere-map-py" src="" class="figure-img img-fluid rounded"></a><figcaption class="figure-caption">Positive Y | Top</figcaption></figure></div>
+            <div class="col"><figure class="figure"><a href="#" download="sphere-map-ny.png" target="_blank"><img id="sphere-map-ny" src="" class="figure-img img-fluid rounded"></a><figcaption class="figure-caption">Negative Y | Bottom</figcaption></figure></div>
+        </div>
+
+    </div>
+    
+    <div class="container my-5">
+        
+        <div class="row">
+            <div class="col">
+                <h1>Paraboloid Map - Three Variations/Orientations</h1>
+
+                <div class="input-group my-4">
+                    <div class="input-group-prepend">
+                        <label class="input-group-text" for="paraboloid-map-size">Output Size in Pixel</label>
+                    </div>               
+                    <select class="custom-select" id="paraboloid-map-size">
+                        <option value="4">  16</option>
+                        <option value="5">  32</option>
+                        <option value="6">  64</option>
+                        <option value="7">  128</option>
+                        <option value="8">  256</option>
+                        <option value="9" selected>  512</option>
+                        <option value="10">1024</option>
+                        <option value="11">2048</option>
+                        <option value="12">4096</option>
+                    </select>
+                    <div class="input-group-append">
+                        <button class="btn btn-outline-secondary" type="button" id="paraboloid-map-compute">Compute Maps</button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col"><figure class="figure"><a href="#" download="paraboloid-map-nx.png" target="_blank"><img id="paraboloid-map-nx" src="" class="figure-img img-fluid rounded"></a><figcaption class="figure-caption">Negative X | Left</figcaption></figure></div>
+            <div class="col"><figure class="figure"><a href="#" download="paraboloid-map-pz.png" target="_blank"><img id="paraboloid-map-pz" src="" class="figure-img img-fluid rounded"></a><figcaption class="figure-caption">Positive Z | Front</figcaption></figure></div>
+            <div class="col"><figure class="figure"><a href="#" download="paraboloid-map-px.png" target="_blank"><img id="paraboloid-map-px" src="" class="figure-img img-fluid rounded"></a><figcaption class="figure-caption">Positive X | Right</figcaption></figure></div>
+            <div class="col"><figure class="figure"><a href="#" download="paraboloid-map-nz.png" target="_blank"><img id="paraboloid-map-nz" src="" class="figure-img img-fluid rounded"></a><figcaption class="figure-caption">Negative Z | Back</figcaption></figure></div>
+            <div class="col"><figure class="figure"><a href="#" download="paraboloid-map-py.png" target="_blank"><img id="paraboloid-map-py" src="" class="figure-img img-fluid rounded"></a><figcaption class="figure-caption">Positive Y | Top</figcaption></figure></div>
+            <div class="col"><figure class="figure"><a href="#" download="paraboloid-map-ny.png" target="_blank"><img id="paraboloid-map-ny" src="" class="figure-img img-fluid rounded"></a><figcaption class="figure-caption">Negative Y | Bottom</figcaption></figure></div>
+        </div>
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/rxjs@6.5.2/bundles/rxjs.umd.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.4.1/dist/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.15.0/dist/umd/popper.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/js/bootstrap.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/jimp@0.6.4/browser/lib/jimp.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/webgl-operate@0.5.2/dist/webgl-operate.min.js"></script>
+
+
+    <script src = "ermt.js"></script>
+
+
+    <script>
+        if (!window.File || !window.FileReader || !window.FileList || !window.Blob) {
+            $('#file-api-missing-alert').toggleClass('d-none');
+        }
+
+        const input = $('#input-file');
+        const label = $("label[for='input-file']");
+
+        const samples = $('#input-samples');
+
+        const buttonCube = $('#cube-map-compute');
+        const buttonSphere = $('#sphere-map-compute');
+        const buttonParaboloid = $('#paraboloid-map-compute');
+
+        const sizeCube = $('#cube-map-size');
+        const sizeSphere = $('#sphere-map-size');
+        const sizeParaboloid = $('#paraboloid-map-size');
+
+        const maps = [ '-map-pz', '-map-nz', '-map-px', '-map-nx', '-map-py', '-map-ny' ];
+
+    
+        compute = (identifier, size) => {
+            const s = (size === null) ? 1 : Math.max(1, Math.min(1024, samples.val()));
+            renderer.compute(identifier, (size === null) ? 16 : size, s);
+        }
+
+
+        input.on('change', () => {
+            const file = input.get(0).files[0];
+            label.text(file.name);
+
+            renderer.input(file, () => {
+                for(map of maps) compute('cube' + map, null);
+                for(map of maps) compute('sphere' + map, null);
+                for(map of maps) compute('paraboloid' + map, null);
+            });
+        });
+
+
+        buttonCube.click(() => {
+            const size = Math.pow(2, sizeCube.val());
+            for(map of maps) compute('cube' + map, null);
+            for(map of maps) compute('cube' + map, size);
+        });
+
+        buttonSphere.click(() => {
+            const size = Math.pow(2, sizeSphere.val());
+            for(map of maps) compute('sphere' + map, null);
+            for(map of maps) compute('sphere' + map, size);
+        });
+
+        buttonParaboloid.click(() => {
+            const size = Math.pow(2, sizeParaboloid.val());
+            for(map of maps) compute('paraboloid' + map, null);
+            for(map of maps) compute('paraboloid' + map, size);
+        });
+
+
+        let canvas = null;
+        let renderer = null;
+
+        window.onload = () => { 
+            
+            const element = $('canvas')[0];
+
+            canvas = new gloperate.Canvas(element, { antialias: false });
+            
+            renderer = new Renderer();
+            canvas.renderer = renderer;
+            renderer.controller = canvas.controller; 
+           
+            for(map of maps) compute('cube' + map, null);
+            for(map of maps) compute('sphere' + map, null);
+            for(map of maps) compute('paraboloid' + map, null);
+        }
+
+    </script>  
+
+</body>
+
+</html>

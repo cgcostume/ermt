@@ -1,0 +1,12 @@
+
+.jumbotron {
+  background-color: transparent;  
+}
+
+figure, figure a, figure a img {
+  width: 100%;
+}
+
+figure a img {
+  image-rendering: pixelated;
+}

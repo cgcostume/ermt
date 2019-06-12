@@ -1,2 +1,3 @@
-# ermt
-Equirectangular Map Transform
+# ERMT - Equirectangular Map Transform
+
+todo

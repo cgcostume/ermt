@@ -1,5 +1,6 @@
 
 class CubemapPreprocessor {
+
     constructor() {
         this.maps = {
             'px': undefined,
@@ -10,10 +11,10 @@ class CubemapPreprocessor {
             'nz': undefined,
         } 
 
-        const directions = ['px', 'py', 'pz', 'nx', 'ny', 'nz'];
+        this._directions = ['px', 'nx', 'py', 'ny', 'pz', 'nz'];
         const promises = [];
 
-        for (const direction of directions) {
+        for (const direction of this._directions) {
             const p = this.getImage(`#cube-map-${direction}`).then((result) => {
                 this.maps[direction] = result;
             });
@@ -42,23 +43,21 @@ class CubemapPreprocessor {
     }
 
     preprocess() {
-        console.log(this.maps);
-        const size = this.maps.px.bitmap.height;
-
         const element = $('#preprocess-canvas')[0];
         const canvas = new gloperate.Canvas(element, { antialias: false });
         const renderer = new CubemapPreprocessorRenderer(this.maps);
 
         canvas.renderer = renderer;
         renderer.controller = canvas.controller; 
-       
-        // renderer.onFrame();
     }
 }
 
 class CubemapPreprocessorRenderer extends gloperate.Renderer {
     constructor(cubemapData) {
         super();
+
+        // TODO: find an elegant way to remove the duplication with CubemapProcessor
+        this._directions = ['px', 'nx', 'py', 'ny', 'pz', 'nz'];
 
         this._cubemapSize = cubemapData.px.bitmap.height;
         this._cubemapData = cubemapData;
@@ -69,6 +68,7 @@ class CubemapPreprocessorRenderer extends gloperate.Renderer {
         this._targetFBO = undefined;
         this._targetTexture = undefined;
         this._uFace = undefined;
+        this._uRoughness = undefined;
     }
 
     onInitialize() {
@@ -115,6 +115,7 @@ class CubemapPreprocessorRenderer extends gloperate.Renderer {
         gl.uniform1i(this._program.uniform('u_cubemap'), 0);
 
         this._uFace = this._program.uniform('u_face');
+        this._uRoughness = this._program.uniform('u_roughness');
 
         return true;
     }
@@ -130,37 +131,75 @@ class CubemapPreprocessorRenderer extends gloperate.Renderer {
     onFrame() {
         const gl = this._context.gl;
         console.log('Preprocessing cubemap...');
-        
-        gl.viewport(0, 0, this._cubemapSize, this._cubemapSize);
+
+        $('#preprocessed-images').empty();
 
         this._program.bind();
-        gl.uniform1i(this._uFace, 1);
-
-        this._targetFBO.bind();
         this._cubemap.bind(gl.TEXTURE0);
 
-        this._ndcRectangle.bind();
-        this._ndcRectangle.draw();
-        this._ndcRectangle.unbind();
+        const numMips = Math.log2(this._cubemapSize);
 
-        const size = this._cubemapSize;
-        const rgba = new Uint8Array(size * size * 4);
-        gl.readPixels(0, 0, size, size, gl.RGBA, gl.UNSIGNED_BYTE, rgba)
+        for (let mipLevel = 0; mipLevel < numMips; mipLevel++) {
+            const targetSize = this._cubemapSize * Math.pow(0.5, mipLevel);
+            this._targetTexture.resize(targetSize, targetSize);
 
-        // write image data to DOM element
+            const roughness = mipLevel / (numMips - 1);
+            console.log(`Processing size ${targetSize} at roughness ${roughness}`);
+
+            gl.viewport(0, 0, targetSize, targetSize);
+            gl.uniform1f(this._uRoughness, roughness);
+
+            const container = jQuery('<div/>', {
+                class: 'row'
+            }).appendTo('#preprocessed-images')
+
+            for (let face = 0; face < 6; face++) {
+                gl.uniform1i(this._uFace, face);
+
+                this._targetFBO.bind();
+
+                this._ndcRectangle.bind();
+                this._ndcRectangle.draw();
+                this._ndcRectangle.unbind();
+
+                const rgba = new Uint8Array(targetSize * targetSize * 4);
+                gl.readPixels(0, 0, targetSize, targetSize, gl.RGBA, gl.UNSIGNED_BYTE, rgba);
+
+                this.addImageToDOM(container, targetSize, rgba, this._directions[face], mipLevel);
+            }
+        }
+    }
+
+    addImageToDOM(parent, size, data, direction, mipLevel) {
         const image = new jimp(size, size);  
-        image.bitmap.data = rgba;
+        image.bitmap.data = data;
 
         let buffer = null;
         image.getBuffer('image/png', (error, result) => buffer = result);
         
-        const img = $(`#preprocessed-map-px`);
-        
         const blob = new Blob([buffer], {type: 'image/png'});
         const url = window.URL.createObjectURL(blob);
         
-        img.attr('src', url); 
-        img.parent().attr('href', url);
+        const div = jQuery('<div/>', {
+            class: 'col'
+        });
+
+        const a = jQuery('<a/>', {
+            href: url,
+            download: `preprocessed-map-${direction}-${mipLevel}.png`
+        });
+
+        const img = jQuery('<img/>', {
+            'class': 'w-100 img-fluid rounded',
+            src: url,
+        }).css('image-rendering', 'crisp-edges');
+        
+        div.appendTo(parent);
+        a.appendTo(div);
+        img.appendTo(a);
+
+        // img.attr('src', url); 
+        // img.parent().attr('href', url);
     }
 }
 
@@ -200,6 +239,7 @@ precision highp int;
 #endif
 
 uniform int u_face;
+uniform float u_roughness;
 
 uniform samplerCube u_cubemap;
 
@@ -272,15 +312,12 @@ void main(void)
     vec3 R = N;
     vec3 V = R;
 
-    // TODO: make uniform
-    const float roughness = 1.0;
-
     float totalWeight = 0.0;   
     vec3 prefilteredColor = vec3(0.0);     
     for(uint i = 0u; i < SAMPLE_COUNT; ++i)
     {
         vec2 Xi = Hammersley(i, SAMPLE_COUNT);
-        vec3 H  = ImportanceSampleGGX(Xi, N, roughness);
+        vec3 H  = ImportanceSampleGGX(Xi, N, u_roughness);
         vec3 L  = normalize(2.0 * dot(V, H) * H - V);
 
         float NdotL = max(dot(N, L), 0.0);

@@ -56,7 +56,8 @@
         <div class="row">
             <div class="col">
                 <p>Hidden canvas using webgl-operate for equirectangular map transforms.</p>
-                <canvas></canvas>
+                <canvas id='ermt-canvas'></canvas>
+                <canvas id='preprocess-canvas'></canvas>
             </div>
         </div>
         
@@ -85,6 +86,7 @@
                     </select>
                     <div class="input-group-append">
                         <button class="btn btn-outline-secondary" type="button" id="cube-map-compute">Compute Maps</button>
+                        <button class="btn btn-outline-secondary" type="button" id="cube-map-preprocess">Preprocess</button>
                     </div>
                 </div>
     
@@ -193,7 +195,8 @@
     <script src="https://cdn.jsdelivr.net/npm/webgl-operate@0.5.2/dist/webgl-operate.min.js"></script>
 
 
-    <script src = "ermt.js"></script>
+    <script src="ermt.js"></script>
+    <script src="cubemappreprocessor.js"></script>
 
 
     <script>
@@ -209,6 +212,8 @@
         const buttonCube = $('#cube-map-compute');
         const buttonSphere = $('#sphere-map-compute');
         const buttonParaboloid = $('#paraboloid-map-compute');
+
+        const buttonPreprocess = $('#cube-map-preprocess');
 
         const sizeCube = $('#cube-map-size');
         const sizeSphere = $('#sphere-map-size');
@@ -253,16 +258,20 @@
             for(map of maps) compute('paraboloid' + map, size);
         });
 
+        buttonPreprocess.click(() => {
+            const preprocessor = new CubemapPreprocessor();
+        });
+
 
         let canvas = null;
         let renderer = null;
 
         window.onload = () => { 
             
-            const element = $('canvas')[0];
+            const element = $('#ermt-canvas')[0];
 
             canvas = new gloperate.Canvas(element, { antialias: false });
-            
+
             renderer = new Renderer();
             canvas.renderer = renderer;
             renderer.controller = canvas.controller; 

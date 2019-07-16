@@ -1,7 +1,12 @@
 
 class CubemapPreprocessor {
 
-    constructor() {
+    constructor(sampleCount) {
+        this._sampleCount = sampleCount;
+        if (this._sampleCount === undefined) {
+            this._sampleCount = 512;
+        }
+
         this.maps = {
             'px': undefined,
             'py': undefined,
@@ -45,7 +50,7 @@ class CubemapPreprocessor {
     preprocess() {
         const element = $('#preprocess-canvas')[0];
         const canvas = new gloperate.Canvas(element, { antialias: false });
-        const renderer = new CubemapPreprocessorRenderer(this.maps);
+        const renderer = new CubemapPreprocessorRenderer(this.maps, this._sampleCount);
 
         canvas.renderer = renderer;
         renderer.controller = canvas.controller; 
@@ -53,12 +58,13 @@ class CubemapPreprocessor {
 }
 
 class CubemapPreprocessorRenderer extends gloperate.Renderer {
-    constructor(cubemapData) {
+    constructor(cubemapData, sampleCount) {
         super();
 
         // TODO: find an elegant way to remove the duplication with CubemapProcessor
         this._directions = ['px', 'nx', 'py', 'ny', 'pz', 'nz'];
 
+        this._sampleCount = sampleCount;
         this._cubemapSize = cubemapData.px.bitmap.height;
         this._cubemapData = cubemapData;
 
@@ -113,6 +119,8 @@ class CubemapPreprocessorRenderer extends gloperate.Renderer {
 
         this._program.bind();
         gl.uniform1i(this._program.uniform('u_cubemap'), 0);
+
+        gl.uniform1i(this._program.uniform('u_sampleCount'), this._sampleCount);
 
         this._uFace = this._program.uniform('u_face');
         this._uRoughness = this._program.uniform('u_roughness');
@@ -192,14 +200,12 @@ class CubemapPreprocessorRenderer extends gloperate.Renderer {
         const img = jQuery('<img/>', {
             'class': 'w-100 img-fluid rounded',
             src: url,
+            id: `preprocessed-map-${direction}-${mipLevel}`,
         }).css('image-rendering', 'crisp-edges');
         
         div.appendTo(parent);
         a.appendTo(div);
         img.appendTo(a);
-
-        // img.attr('src', url); 
-        // img.parent().attr('href', url);
     }
 }
 
@@ -239,6 +245,7 @@ precision highp int;
 #endif
 
 uniform int u_face;
+uniform int u_sampleCount;
 uniform float u_roughness;
 
 uniform samplerCube u_cubemap;
@@ -246,7 +253,6 @@ uniform samplerCube u_cubemap;
 varying vec2 v_uv;
 
 const float PI         = 3.1415926535897932384626433832795;
-const uint SAMPLE_COUNT = 512u;
 
 const vec3 o = vec3(0.0, 1.0,-1.0); // orientation transform helper
 
@@ -314,9 +320,9 @@ void main(void)
 
     float totalWeight = 0.0;   
     vec3 prefilteredColor = vec3(0.0);     
-    for(uint i = 0u; i < SAMPLE_COUNT; ++i)
+    for(int i = 0; i < u_sampleCount; ++i)
     {
-        vec2 Xi = Hammersley(i, SAMPLE_COUNT);
+        vec2 Xi = Hammersley(uint(i), uint(u_sampleCount));
         vec3 H  = ImportanceSampleGGX(Xi, N, u_roughness);
         vec3 L  = normalize(2.0 * dot(V, H) * H - V);
 

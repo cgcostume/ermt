@@ -74,6 +74,7 @@ class CubemapPreprocessorRenderer extends gloperate.Renderer {
         this._targetFBO = undefined;
         this._targetTexture = undefined;
         this._uFace = undefined;
+        this._uMode = undefined;
         this._uRoughness = undefined;
     }
 
@@ -124,6 +125,7 @@ class CubemapPreprocessorRenderer extends gloperate.Renderer {
 
         this._uFace = this._program.uniform('u_face');
         this._uRoughness = this._program.uniform('u_roughness');
+        this._uMode = this._program.uniform('u_mode');
 
         return true;
     }
@@ -145,6 +147,39 @@ class CubemapPreprocessorRenderer extends gloperate.Renderer {
         this._program.bind();
         this._cubemap.bind(gl.TEXTURE0);
 
+        /**
+         * Calculate diffuse convolution (lambert sampling)
+         */
+        for (let face = 0; face < 6; face++) {
+            const targetSize = 64;
+            this._targetTexture.resize(targetSize, targetSize);
+
+            console.log(`Processing diffuse texture.`);
+
+            gl.viewport(0, 0, targetSize, targetSize);
+
+            const container = jQuery('<div/>', {
+                class: 'row'
+            }).appendTo('#preprocessed-images')
+
+            gl.uniform1i(this._uMode, 0);
+            gl.uniform1i(this._uFace, face);
+
+            this._targetFBO.bind();
+
+            this._ndcRectangle.bind();
+            this._ndcRectangle.draw();
+            this._ndcRectangle.unbind();
+
+            const rgba = new Uint8Array(targetSize * targetSize * 4);
+            gl.readPixels(0, 0, targetSize, targetSize, gl.RGBA, gl.UNSIGNED_BYTE, rgba);
+
+            this.addImageToDOM(container, targetSize, rgba, this._directions[face], 'diffuse');
+        }
+
+        /**
+         * Calculate specular convolution (GGX sampling)
+         */
         const numMips = Math.log2(this._cubemapSize);
 
         for (let mipLevel = 0; mipLevel < numMips; mipLevel++) {
@@ -156,6 +191,7 @@ class CubemapPreprocessorRenderer extends gloperate.Renderer {
 
             gl.viewport(0, 0, targetSize, targetSize);
             gl.uniform1f(this._uRoughness, roughness);
+            gl.uniform1i(this._uMode, 1);
 
             const container = jQuery('<div/>', {
                 class: 'row'
@@ -245,6 +281,7 @@ precision highp int;
 #endif
 
 uniform int u_face;
+uniform int u_mode;
 uniform int u_sampleCount;
 uniform float u_roughness;
 
@@ -311,6 +348,35 @@ vec3 ImportanceSampleGGX(vec2 Xi, vec3 N, float roughness)
     return normalize(sampleVec);
 }
 
+// http://holger.dammertz.org/stuff/notes_HammersleyOnHemisphere.html
+vec3 HemisphereSampleCos(vec2 Xi, vec3 N)
+{
+    float phi = Xi.x * 2.0 * PI;
+    float cosTheta = sqrt(1.0 - Xi.y);
+    float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
+    vec3 H = vec3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
+
+    // from tangent-space vector to world-space sample vector
+    vec3 up        = abs(N.z) < 0.999 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
+    vec3 tangent   = normalize(cross(up, N));
+    vec3 bitangent = cross(N, tangent);
+    
+    vec3 sampleVec = tangent * H.x + bitangent * H.y + N * H.z;
+    return normalize(sampleVec);
+}
+
+vec3 SRGBtoLINEAR(vec3 srgbIn)
+{
+    const float GAMMA = 2.2;
+    return pow(srgbIn.xyz, vec3(GAMMA));
+}
+
+vec3 LINEARtoSRGB(vec3 color)
+{
+    const float INV_GAMMA = 1.0 / 2.2;
+    return pow(color, vec3(INV_GAMMA));
+}
+
 void main(void)
 {
     vec3 ray = cubeTransform(v_uv, u_face);
@@ -319,22 +385,29 @@ void main(void)
     vec3 V = R;
 
     float totalWeight = 0.0;   
-    vec3 prefilteredColor = vec3(0.0);     
+    vec4 prefilteredColor = vec4(0.0);     
     for(int i = 0; i < u_sampleCount; ++i)
     {
         vec2 Xi = Hammersley(uint(i), uint(u_sampleCount));
-        vec3 H  = ImportanceSampleGGX(Xi, N, u_roughness);
-        vec3 L  = normalize(2.0 * dot(V, H) * H - V);
+        vec3 L;
+
+        if (u_mode == 0) {
+            L = HemisphereSampleCos(Xi, N);
+        } else {
+            vec3 H = ImportanceSampleGGX(Xi, N, u_roughness);
+            L = normalize(2.0 * dot(V, H) * H - V);
+        }
 
         float NdotL = max(dot(N, L), 0.0);
         if(NdotL > 0.0)
         {
-            prefilteredColor += texture(u_cubemap, L).rgb * NdotL;
+            vec4 color = texture(u_cubemap, L);
+            prefilteredColor += vec4(SRGBtoLINEAR(color.rgb), color.a) * NdotL;
             totalWeight += NdotL;
         }
     }
     prefilteredColor = prefilteredColor / totalWeight;
 
-    fragColor = vec4(prefilteredColor, 1.0);
+    fragColor = vec4(LINEARtoSRGB(prefilteredColor.rgb), prefilteredColor.a);
 }
 `;

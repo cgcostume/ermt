@@ -64,6 +64,7 @@ class CubemapPreprocessorRenderer extends gloperate.Renderer {
         // TODO: find an elegant way to remove the duplication with CubemapProcessor
         this._directions = ['px', 'nx', 'py', 'ny', 'pz', 'nz'];
 
+        this._targetsWebGL = true;
         this._sampleCount = sampleCount;
         this._cubemapSize = cubemapData.px.bitmap.height;
         this._cubemapData = cubemapData;
@@ -215,33 +216,59 @@ class CubemapPreprocessorRenderer extends gloperate.Renderer {
     }
 
     addImageToDOM(parent, size, data, direction, mipLevel) {
-        const image = new jimp(size, size);  
-        image.bitmap.data = data;
 
-        let buffer = null;
-        image.getBuffer('image/png', (error, result) => buffer = result);
-        
-        const blob = new Blob([buffer], {type: 'image/png'});
-        const url = window.URL.createObjectURL(blob);
-        
-        const div = jQuery('<div/>', {
-            class: 'col'
+        /**
+         * Switch positive and negative X faces when exporting for WebGL.
+         * This is necessary due to the layout of cubemap faces in the WebGL specification.
+         */
+        if (this._targetsWebGL) {
+            if (direction === 'px') {
+                direction = 'nx';
+            } else if (direction === 'nx') {
+                direction = 'px';
+            }
+        }
+
+        const jimpImage = new jimp(size, size);  
+        jimpImage.bitmap.data = data;
+
+        Jimp.read(jimpImage).then(image => {
+            /**
+             * Rotate the faces by 180° when exporting for WebGL due to the specification of cube map faces
+             * in the WebGL standard.
+             * Rotation is achieved by flipping twice with jimp, there is a bug which resizes the image
+             * when doing it in one operation.
+             */
+            if (this._targetsWebGL) {
+                image.flip(false, true);
+                image.flip(true, false);
+            }
+
+            let buffer = null;
+            image.getBuffer('image/png', (error, result) => buffer = result);
+            
+            const blob = new Blob([buffer], {type: 'image/png'});
+            const url = window.URL.createObjectURL(blob);
+            
+            const div = jQuery('<div/>', {
+                class: 'col'
+            });
+    
+            const a = jQuery('<a/>', {
+                href: url,
+                download: `preprocessed-map-${direction}-${mipLevel}.png`
+            });
+    
+            const img = jQuery('<img/>', {
+                'class': 'w-100 img-fluid rounded',
+                src: url,
+                id: `preprocessed-map-${direction}-${mipLevel}`,
+            }).css('image-rendering', 'crisp-edges');
+            
+            div.appendTo(parent);
+            a.appendTo(div);
+            img.appendTo(a);
         });
-
-        const a = jQuery('<a/>', {
-            href: url,
-            download: `preprocessed-map-${direction}-${mipLevel}.png`
-        });
-
-        const img = jQuery('<img/>', {
-            'class': 'w-100 img-fluid rounded',
-            src: url,
-            id: `preprocessed-map-${direction}-${mipLevel}`,
-        }).css('image-rendering', 'crisp-edges');
-        
-        div.appendTo(parent);
-        a.appendTo(div);
-        img.appendTo(a);
     }
 }
 

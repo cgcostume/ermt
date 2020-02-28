@@ -151,6 +151,10 @@ class CubemapPreprocessorRenderer extends gloperate.Renderer {
         /**
          * Calculate diffuse convolution (lambert sampling)
          */
+        const diffuseContainer = jQuery('<div/>', {
+            class: 'row'
+        }).appendTo('#preprocessed-images')
+
         for (let face = 0; face < 6; face++) {
             const targetSize = 64;
             this._targetTexture.resize(targetSize, targetSize);
@@ -158,10 +162,6 @@ class CubemapPreprocessorRenderer extends gloperate.Renderer {
             console.log(`Processing diffuse texture.`);
 
             gl.viewport(0, 0, targetSize, targetSize);
-
-            const container = jQuery('<div/>', {
-                class: 'row'
-            }).appendTo('#preprocessed-images')
 
             gl.uniform1i(this._uMode, 0);
             gl.uniform1i(this._uFace, face);
@@ -175,7 +175,7 @@ class CubemapPreprocessorRenderer extends gloperate.Renderer {
             const rgba = new Uint8Array(targetSize * targetSize * 4);
             gl.readPixels(0, 0, targetSize, targetSize, gl.RGBA, gl.UNSIGNED_BYTE, rgba);
 
-            this.addImageToDOM(container, targetSize, rgba, this._directions[face], 'diffuse');
+            this.addImageToDOM(diffuseContainer, targetSize, rgba, this._directions[face], 'diffuse');
         }
 
         /**

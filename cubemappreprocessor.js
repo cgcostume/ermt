@@ -183,6 +183,8 @@ class CubemapPreprocessorRenderer extends gloperate.Renderer {
          */
         const numMips = Math.log2(this._cubemapSize);
 
+        const promises = [];
+
         for (let mipLevel = 0; mipLevel < numMips; mipLevel++) {
             const targetSize = this._cubemapSize * Math.pow(0.5, mipLevel);
             this._targetTexture.resize(targetSize, targetSize);
@@ -196,7 +198,7 @@ class CubemapPreprocessorRenderer extends gloperate.Renderer {
 
             const container = jQuery('<div/>', {
                 class: 'row'
-            }).appendTo('#preprocessed-images')
+            }).appendTo('#preprocessed-images');
 
             for (let face = 0; face < 6; face++) {
                 gl.uniform1i(this._uFace, face);
@@ -210,12 +212,16 @@ class CubemapPreprocessorRenderer extends gloperate.Renderer {
                 const rgba = new Uint8Array(targetSize * targetSize * 4);
                 gl.readPixels(0, 0, targetSize, targetSize, gl.RGBA, gl.UNSIGNED_BYTE, rgba);
 
-                this.addImageToDOM(container, targetSize, rgba, this._directions[face], mipLevel);
+                promises.push(this.addImageToDOM(container, targetSize, rgba, this._directions[face], mipLevel));
             }
         }
+
+        Promise.all(promises).then(() => {
+            this.createMipmapAtlas();
+        })
     }
 
-    addImageToDOM(parent, size, data, direction, mipLevel) {
+    async addImageToDOM(parent, size, data, direction, mipLevel) {
 
         /**
          * Switch positive and negative X faces when exporting for WebGL.
@@ -232,7 +238,7 @@ class CubemapPreprocessorRenderer extends gloperate.Renderer {
         const jimpImage = new jimp(size, size);  
         jimpImage.bitmap.data = data;
 
-        Jimp.read(jimpImage).then(image => {
+        return Jimp.read(jimpImage).then(image => {
             /**
              * Rotate the faces by 180° when exporting for WebGL due to the specification of cube map faces
              * in the WebGL standard.
@@ -260,15 +266,82 @@ class CubemapPreprocessorRenderer extends gloperate.Renderer {
             });
     
             const img = jQuery('<img/>', {
-                'class': 'w-100 img-fluid rounded',
-                src: url,
                 id: `preprocessed-map-${direction}-${mipLevel}`,
             }).css('image-rendering', 'crisp-edges');
-            
+
             div.appendTo(parent);
             a.appendTo(div);
             img.appendTo(a);
+
+            return [img, url];
+        }).then((data) => {
+            let img = data[0];
+            let url = data[1];
+
+            return new Promise((resolve) => {
+                img.attr('src', url).on('load', () => resolve());
+            });
         });
+    }
+
+    createMipmapAtlas() {
+        const mip0Size = $(`#preprocessed-map-nx-0`).get(0).width;
+        const mipLevels = Math.log2(mip0Size);
+
+        const canvas = document.createElement('canvas');
+        canvas.width = mip0Size * 4;
+        canvas.height = mip0Size * 2;
+
+        // Get the drawing context
+        const ctx = canvas.getContext('2d');
+
+        let mipSize = mip0Size;
+        let offset = [0, 0];
+        for (let i = 0; i < mipLevels; ++i) {
+            ctx.drawImage($(`#preprocessed-map-nx-${i}`).get(0),
+                0, 0, mipSize, mipSize,
+                offset[0], offset[1], mipSize, mipSize);
+
+            ctx.drawImage($(`#preprocessed-map-pz-${i}`).get(0),
+                0, 0, mipSize, mipSize,
+                offset[0] + mipSize, offset[1], mipSize, mipSize);
+
+            ctx.drawImage($(`#preprocessed-map-px-${i}`).get(0),
+                0, 0, mipSize, mipSize,
+                offset[0] + 2 * mipSize, offset[1], mipSize, mipSize);
+
+            ctx.drawImage($(`#preprocessed-map-nz-${i}`).get(0),
+                0, 0, mipSize, mipSize,
+                offset[0] + 3 * mipSize, offset[1], mipSize, mipSize);
+
+            ctx.drawImage($(`#preprocessed-map-py-${i}`).get(0),
+                0, 0, mipSize, mipSize,
+                offset[0], offset[1] + mipSize, mipSize, mipSize);
+
+            ctx.drawImage($(`#preprocessed-map-ny-${i}`).get(0),
+                0, 0, mipSize, mipSize,
+                offset[0] + mipSize, offset[1] + mipSize, mipSize, mipSize);
+
+            offset[0] += 2 * mipSize;
+            offset[1] += mipSize;
+            mipSize /= 2;
+        }
+
+        const url = canvas.toDataURL();
+
+        const a = jQuery('<a/>', {
+            href: url,
+            download: `preprocessed-map.png`
+        });
+
+        const img = jQuery('<img/>', {
+            'class': 'w-100 img-fluid rounded',
+            src: url,
+            id: `preprocessed-map`,
+        }).css('image-rendering', 'crisp-edges');
+
+        a.appendTo($('#preprocessed-preview'));
+        img.appendTo(a);
     }
 }
 

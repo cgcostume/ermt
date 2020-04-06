@@ -35,12 +35,12 @@ class Renderer extends gloperate.Renderer {
 
 
         const internalFormatAndType = gloperate.Wizard.queryInternalTextureFormat(
-            this._context, gl.RGB, gloperate.Wizard.Precision.byte);
+            this._context, gl.RGBA, gloperate.Wizard.Precision.byte);
 
 
         this._targetTexture = new gloperate.Texture2D(this._context, 'TargetTexture');
         this._targetTexture.initialize(1, 1, 
-            internalFormatAndType[0], gl.RGB, internalFormatAndType[1]);
+            internalFormatAndType[0], gl.RGBA, internalFormatAndType[1]);
 
         this._targetFBO = new gloperate.Framebuffer(this._context, 'TargetFBO');
         this._targetFBO.initialize([[this._context.gl2facade.COLOR_ATTACHMENT0, this._targetTexture] ]);      
@@ -48,7 +48,7 @@ class Renderer extends gloperate.Renderer {
     
 
         this._sourceTexture = new gloperate.Texture2D(this._context);
-        this._sourceTexture.initialize(1, 1, internalFormatAndType[0], gl.RGB, internalFormatAndType[1]);
+        this._sourceTexture.initialize(1, 1, internalFormatAndType[0], gl.RGBA, internalFormatAndType[1]);
 
 
         const vert = new gloperate.Shader(this._context, gl.VERTEX_SHADER, 'ndc-rectangle (in-line)');

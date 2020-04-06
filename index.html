@@ -56,7 +56,8 @@
         <div class="row">
             <div class="col">
                 <p>Hidden canvas using webgl-operate for equirectangular map transforms.</p>
-                <canvas></canvas>
+                <canvas id='ermt-canvas'></canvas>
+                <canvas id='preprocess-canvas'></canvas>
             </div>
         </div>
         
@@ -182,6 +183,52 @@
 
     </div>
 
+    <div class="container mt-5">
+
+        <div class="row">
+            <div class="col">
+                <h1>Cubemap Preprocessing for PBR</h1>
+
+                <div class="input-group my-4">
+                    <div class="input-group-prepend">
+                        <label class="input-group-text" for="brdf-type">BRDF</label>
+                    </div>
+                    <select class="custom-select" id="brdf-type">
+                        <option value="ggx" selected>GGX</option>
+                    </select>
+                    <div class="input-group-prepend">
+                        <label class="input-group-text" for="brdf-sample-count">Sample Count</label>
+                    </div>
+                    <select class="custom-select" id="brdf-sample-count">
+                        <option value="512">512</option>
+                        <option value="1024" selected>1024</option>
+                        <option value="2048">2048</option>
+                        <option value="4096">4096</option>
+                    </select>
+                    <div class="input-group-append">
+                        <button class="btn btn-outline-secondary" type="button" id="cube-map-preprocess">Preprocess</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col">
+                <div>
+                    <button class="btn btn-outline-secondary" type="button" id="download-preprocessed">Download indiviudal textures</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="row my-4">
+            <div class="col">
+                <div id="preprocessed-preview"></div>
+                <div id="preprocessed-images" style="display:none"></div>
+            </div>
+        </div>
+
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/rxjs@6.5.2/bundles/rxjs.umd.min.js"></script>
 
     <script src="https://cdn.jsdelivr.net/npm/jquery@3.4.1/dist/jquery.min.js"></script>
@@ -192,8 +239,11 @@
 
     <script src="https://cdn.jsdelivr.net/npm/webgl-operate@0.5.2/dist/webgl-operate.min.js"></script>
 
+    <script src="dist/jszip.min.js"></script>
+    <script src="dist/FileSaver.min.js"></script>
 
-    <script src = "ermt.js"></script>
+    <script src="ermt.js"></script>
+    <script src="cubemappreprocessor.js"></script>
 
 
     <script>
@@ -209,6 +259,10 @@
         const buttonCube = $('#cube-map-compute');
         const buttonSphere = $('#sphere-map-compute');
         const buttonParaboloid = $('#paraboloid-map-compute');
+
+        const buttonPreprocess = $('#cube-map-preprocess');
+        const buttonDownload = $('#download-preprocessed');
+        const brdfSamples = $('#brdf-sample-count');
 
         const sizeCube = $('#cube-map-size');
         const sizeSphere = $('#sphere-map-size');
@@ -253,16 +307,48 @@
             for(map of maps) compute('paraboloid' + map, size);
         });
 
+        buttonPreprocess.click(() => {
+            console.log(brdfSamples.val());
+            const preprocessor = new CubemapPreprocessor(brdfSamples.val());
+        });
+
+        buttonDownload.click(() => {
+            const zipName = `${label.text()}.zip`;
+
+            const zip = new JSZip();
+            const promises = [];
+
+            $('img[id*="preprocessed-map"]').each((_, element) => {
+                const p = fetch(element.src)
+                    .then((response) => {
+                        return response.arrayBuffer();
+                    })
+                    .then((data) => {
+                        zip.file(`${element.id}.png`, data);
+                    });
+
+                promises.push(p);
+            })
+
+            Promise.all(promises).then(() => {
+                zip.generateAsync({type:'blob'}).then((blob) => {
+                    saveAs(blob, zipName);
+                }, function (err) {
+                    console.log('Downloading zip failed.');
+                });
+            });
+        });
+
 
         let canvas = null;
         let renderer = null;
 
         window.onload = () => { 
             
-            const element = $('canvas')[0];
+            const element = $('#ermt-canvas')[0];
 
             canvas = new gloperate.Canvas(element, { antialias: false });
-            
+
             renderer = new Renderer();
             canvas.renderer = renderer;
             renderer.controller = canvas.controller; 
